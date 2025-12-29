@@ -1,10 +1,10 @@
 import React from 'react';
-import { Droplets, ThermometerSun, Info } from 'lucide-react';
+import { Droplets, ThermometerSun, Info, AlertTriangle } from 'lucide-react';
 import { useBoilerData } from '../hooks/useBoilerData';
 import { CircularGauge } from './CircularGauge';
 import { FormulaTooltip } from './FormulaTooltip';
 import { TOOLTIP_FORMULAS } from '../data/helpContent';
-import { WASTE_CATEGORIES } from '../utils/combustionLogic';
+import { getFireStatus, calculateEstimatedPCI, calculateTotalZonalFlow, BARYCENTER_THRESHOLDS } from '../utils/combustionLogic';
 
 interface Props {
     data: ReturnType<typeof useBoilerData>;
@@ -18,13 +18,24 @@ export const ProcessIndicators: React.FC<Props> = React.memo(({ data, sh5Temp, s
     // Determine Fire Status Color
     const { currentBarycenter, simulation, foulingFactor } = data;
 
-    // Determine color based on fire status
+    // Use calibrated fire status from combustionLogic
+    const fireStatus = getFireStatus(currentBarycenter);
+
+    // Determine color based on calibrated fire status (3.0-4.2 optimal zone)
     const getBarycenterColor = () => {
         if (currentBarycenter === 0) return '#94a3b8'; // slate-400
-        if (currentBarycenter < 2.0) return '#2563eb'; // blue-600
-        if (currentBarycenter > 3.5) return '#dc2626'; // red-600
+        if (currentBarycenter < BARYCENTER_THRESHOLDS.FORWARD_RISK) return '#2563eb'; // blue-600
+        if (currentBarycenter > BARYCENTER_THRESHOLDS.BACKWARD_RISK) return '#dc2626'; // red-600
         return '#16a34a'; // green-600
     };
+
+    // Calculate dynamic PCI from current simulation values
+    const totalZonalFlow = calculateTotalZonalFlow(
+        (data.zones.zone1 / 100) * data.totalPrimaryAirFlow,
+        (data.zones.zone2 / 100) * data.totalPrimaryAirFlow,
+        (data.zones.zone3 / 100) * data.totalPrimaryAirFlow
+    );
+    const dynamicPCI = calculateEstimatedPCI(steamFlow, totalZonalFlow, o2);
 
     // Economic Calculation
     const steamValue = steamFlow * 45; // €/h (Valorisation)
@@ -144,19 +155,23 @@ export const ProcessIndicators: React.FC<Props> = React.memo(({ data, sh5Temp, s
                     </div>
                 </div>
             </FormulaTooltip>
-            {/* WASTE MIX (NATURE DECHETS) - NEW REQUEST */}
+            {/* WASTE MIX (NATURE DECHETS) - With Dynamic PCI & Fire Status */}
             <div
-                className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-help transition-all hover:border-slate-400 relative group"
-                title="Nature du déchet (PCI Estimé)"
+                className={`p-4 rounded-xl shadow-sm border cursor-help transition-all hover:border-slate-400 relative group ${fireStatus.risk === 'high' ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}
+                title={fireStatus.advice}
             >
                 <div className="flex items-center gap-2 text-slate-500 mb-1 text-sm font-semibold">
                     <Droplets size={16} className="text-purple-500" /> Mix Déchets
+                    {fireStatus.risk === 'high' && <AlertTriangle size={14} className="text-amber-500" />}
                 </div>
-                <div className="text-sm font-bold text-slate-700 uppercase leading-none mt-1">
-                    {WASTE_CATEGORIES[data.wasteMix.category || 'STANDARD'].label}
+                <div className={`text-sm font-bold uppercase leading-none mt-1 ${fireStatus.color}`}>
+                    {fireStatus.status}
                 </div>
                 <div className="text-xs text-slate-400 font-mono mt-1">
-                    ~{Math.round(data.wasteMix.dibRatio * 12000 + (1 - data.wasteMix.dibRatio) * 8500)} kJ/kg
+                    PCI: ~{dynamicPCI} kJ/kg
+                </div>
+                <div className="text-[9px] text-slate-400 mt-1 truncate" title={fireStatus.advice}>
+                    {fireStatus.advice.substring(0, 40)}...
                 </div>
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Info className="w-4 h-4 text-slate-400" />

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Brain, AlertOctagon, CheckCircle, Flame, CloudRain, Sun, Activity, Info } from 'lucide-react';
 import { useBoilerData } from '../hooks/useBoilerData';
-import { calculateEstimatedPCI } from '../utils/combustionLogic';
+import { calculateEstimatedPCI, classifyWasteByPCI, WASTE_CATEGORIES, PHYSICS } from '../utils/combustionLogic';
 import { CalculationTooltip, type CalculationDetails } from './CalculationTooltip';
 
 interface Props {
@@ -12,42 +12,43 @@ interface Props {
 export const AIAnalyst: React.FC<Props> = React.memo(({ data }) => {
     const { filteredHistory, simulation, steamTarget } = data;
 
-    // A. PCI Estimation (Virtual Sensor)
-    // A. PCI Estimation (Virtual Sensor)
-    // We use simulated steam flow (which reflects PCI boost) instead of target
+    // A. PCI Estimation (Virtual Sensor) using calibrated formula
     const estimatedPCI = useMemo(() => calculateEstimatedPCI(
         simulation.steamFlow,
         simulation.totalAir,
         simulation.simulatedO2
     ), [simulation.steamFlow, simulation.totalAir, simulation.simulatedO2]);
 
-    // Build calculation trace for tooltip
-    const pciCalculationDetails: CalculationDetails = useMemo(() => {
-        const o2Consumed = 21 - simulation.simulatedO2;
-        const performanceRatio = (steamTarget * 1000) / (simulation.totalAir * o2Consumed);
-        const baseRatio = 0.068;
+    // Auto-classify waste based on calculated PCI
+    const wasteCategory = useMemo(() => classifyWasteByPCI(estimatedPCI), [estimatedPCI]);
+    const wasteCategoryInfo = WASTE_CATEGORIES[wasteCategory];
 
-        let interpretation = 'Combustion normale avec PCI standard.';
-        if (estimatedPCI < 8000) {
+    // Build calculation trace for tooltip with calibrated formula
+    const pciCalculationDetails: CalculationDetails = useMemo(() => {
+        const o2Consumed = PHYSICS.O2_IN_AIR - simulation.simulatedO2;
+
+        let interpretation = `Combustion normale. Catégorie détectée: ${wasteCategoryInfo.label}`;
+        if (estimatedPCI < 7000) {
             interpretation = 'Déchets humides ou organiques → combustion lente, moins de chaleur produite.';
         } else if (estimatedPCI > 10500) {
             interpretation = 'Déchets secs/plastiques → combustion rapide, risque de surchauffe SH5.';
         }
 
         return {
-            title: 'Estimation PCI Virtuel',
-            formula: 'PCI = 9200 × (Performance / Référence)',
+            title: 'Estimation PCI Virtuel (Formule Calibrée)',
+            formula: 'PCI = (Vapeur × 2675) / (Air × 0.00129 × (O2_consommé / 21))',
             steps: [
-                { label: 'Vapeur Produite', value: steamTarget, unit: 'T/h' },
-                { label: 'Air Total', value: simulation.totalAir, unit: 'Nm³/h' },
+                { label: 'Vapeur Produite', value: simulation.steamFlow.toFixed(1), unit: 'T/h' },
+                { label: 'Enthalpie Vapeur', value: PHYSICS.STEAM_ENTHALPY, unit: 'kJ/kg' },
+                { label: 'Air Total', value: simulation.totalAir.toFixed(0), unit: 'Nm³/h' },
+                { label: 'Densité Air', value: PHYSICS.AIR_DENSITY, unit: 'kg/Nm³' },
                 { label: 'O₂ Consommé', value: o2Consumed.toFixed(1), unit: '%' },
-                { label: 'Ratio Performance', value: performanceRatio.toFixed(4) },
-                { label: 'Ratio Référence', value: baseRatio },
-                { label: 'PCI Calculé', value: estimatedPCI, unit: 'kJ/kg' }
+                { label: 'PCI Calculé', value: estimatedPCI, unit: 'kJ/kg' },
+                { label: 'Catégorie', value: wasteCategoryInfo.label }
             ],
             interpretation
         };
-    }, [steamTarget, simulation.totalAir, simulation.simulatedO2, estimatedPCI]);
+    }, [simulation.steamFlow, simulation.totalAir, simulation.simulatedO2, estimatedPCI, wasteCategoryInfo.label]);
 
     let pciStatus = { label: 'Normal (Standard)', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200', icon: Sun };
 
