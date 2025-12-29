@@ -56,5 +56,60 @@ export interface BoilerConfig {
     wasteMix: WasteMix;
 }
 
+// ============================================================
+// ANOMALY DETECTION TYPES (Maintenance Prédictive)
+// ============================================================
+
+/**
+ * Niveaux de risque du système
+ */
+export type RiskLevel = 'NORMAL' | 'WARNING' | 'CRITICAL' | 'EMERGENCY';
+
+/**
+ * Types d'anomalies surveillées
+ */
+export type AnomalyType =
+    | 'BARYCENTER_REAR'      // Feu trop en arrière (> 4.5)
+    | 'O2_LOW'               // O2 trop bas (< 4%)
+    | 'TEMP_SPIKE'           // Montée rapide de température (> 10°C/2min)
+    | 'COMBUSTION_UNSTABLE'  // Combinaison de plusieurs anomalies
+    | 'EXPLOSION_RISK';      // Signature d'explosion imminente
+
+/**
+ * Signature d'une anomalie détectée
+ */
+export interface AnomalySignature {
+    type: AnomalyType;
+    timestamp: string;
+    value: number;
+    threshold: number;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    message: string;
+    action: string;
+}
+
+/**
+ * État global des anomalies
+ */
+export interface AnomalyState {
+    riskLevel: RiskLevel;
+    activeAnomalies: AnomalySignature[];
+    lastCheck: string;
+    explosionRiskScore: number;  // 0-100, > 70 = CRITICAL
+}
+
+/**
+ * Seuils de détection d'anomalies (calibrés sur l'incident du 20/12/2025)
+ */
+export const ANOMALY_THRESHOLDS = {
+    BARYCENTER_MAX: 4.5,        // Au-delà = feu trop en arrière
+    O2_MIN: 4.0,                // En dessous = risque imbrûlés gazeux
+    TEMP_DELTA_MAX: 10,         // °C d'augmentation max sur 2 minutes
+    TEMP_DELTA_WINDOW_MS: 120000, // 2 minutes en millisecondes
+    RISK_SCORE_WARNING: 40,
+    RISK_SCORE_CRITICAL: 70,
+    RISK_SCORE_EMERGENCY: 90,
+};
+
 // Dummy export to prevent "module has no exports" issues in some environments
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";

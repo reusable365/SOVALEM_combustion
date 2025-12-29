@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { DataPoint, ZoneData, WasteMix } from '../types';
+import type { DataPoint, ZoneData, WasteMix, AnomalyState } from '../types';
 import { calculateBarycenterWithWaste, getFireStatus } from '../utils/combustionLogic';
-import { runSimulation } from '../utils/simulationEngine';
+import { runSimulation, checkAnomalySignatures } from '../utils/simulationEngine';
 import { parseCSVData } from '../utils/csvParser';
 
 // Constants for performance optimization
@@ -56,6 +56,14 @@ export const useBoilerData = () => {
 
     const [wasteMix, setWasteMix] = useState<WasteMix>({ dibRatio: 0.2, category: 'STANDARD' });
     const [locked, setLocked] = useState<Record<number, boolean>>({ 1: false, 2: false, 3: true });
+
+    // Anomaly Detection State
+    const [anomalyState, setAnomalyState] = useState<AnomalyState>({
+        riskLevel: 'NORMAL',
+        activeAnomalies: [],
+        lastCheck: new Date().toISOString(),
+        explosionRiskScore: 0
+    });
 
     // History - use ref for internal accumulation, state for UI
     const historyRef = useRef<DataPoint[]>([]);
@@ -253,7 +261,17 @@ export const useBoilerData = () => {
                 setHistory(historyRef.current);
             }
 
-            // Removed setUiTick - not needed
+            // ========================================
+            // ANOMALY DETECTION (Check every UI tick)
+            // ========================================
+            const currentSim = computeInstantSimulation();
+            const newAnomalyState = checkAnomalySignatures(
+                currentBarycenter,
+                currentSim.simulatedO2,
+                physicsRef.current.realSH5
+            );
+            setAnomalyState(newAnomalyState);
+
         }, UI_REFRESH_INTERVAL_MS);
 
         return () => clearInterval(uiLoop);
@@ -331,6 +349,8 @@ export const useBoilerData = () => {
         handleFileUpload,
         timeSpeed, setTimeSpeed,
         wasteDeposit,
-        foulingFactor, handleSootBlowing
+        foulingFactor, handleSootBlowing,
+        // Anomaly Detection
+        anomalyState
     };
 };

@@ -145,3 +145,164 @@ export const runSimulation = (params: SimulationParams): SimulationResult => {
         steamFlow: Number(simulatedSteam.toFixed(1))
     };
 };
+
+// ============================================================
+// ANOMALY DETECTION MODULE (Maintenance Prédictive)
+// Calibré sur l'incident du 20/12/2025 à 00h35
+// ============================================================
+
+import type { AnomalySignature, AnomalyState, RiskLevel } from '../types';
+import { ANOMALY_THRESHOLDS } from '../types';
+
+// Buffer pour stocker l'historique des températures (pour détecter les spikes)
+const tempHistory: { timestamp: number; temp: number }[] = [];
+const MAX_TEMP_HISTORY = 60; // Garder 60 points max
+
+/**
+ * Ajoute une température à l'historique
+ */
+const recordTemperature = (temp: number): void => {
+    tempHistory.push({ timestamp: Date.now(), temp });
+    while (tempHistory.length > MAX_TEMP_HISTORY) {
+        tempHistory.shift();
+    }
+};
+
+/**
+ * Calcule le delta de température sur les 2 dernières minutes
+ */
+const calculateTempDelta = (): number => {
+    if (tempHistory.length < 2) return 0;
+
+    const now = Date.now();
+    const windowStart = now - ANOMALY_THRESHOLDS.TEMP_DELTA_WINDOW_MS;
+
+    // Trouver la température la plus ancienne dans la fenêtre
+    const oldestInWindow = tempHistory.find(t => t.timestamp >= windowStart);
+    const newest = tempHistory[tempHistory.length - 1];
+
+    if (!oldestInWindow) return 0;
+
+    return newest.temp - oldestInWindow.temp;
+};
+
+/**
+ * DÉTECTION DES SIGNATURES D'ANOMALIE
+ * Surveille les 3 paramètres critiques:
+ * 1. Barycentre > 4.5 (feu trop en arrière)
+ * 2. O2 < 4% (manque d'air)
+ * 3. Delta T° > 10°C en 2 minutes (spike thermique)
+ * 
+ * @param barycenter - Position du front de flamme
+ * @param o2Level - Niveau d'O2 en sortie chaudière (%)
+ * @param sh5Temp - Température surchauffeur 5 (°C)
+ * @returns État des anomalies avec niveau de risque
+ */
+export const checkAnomalySignatures = (
+    barycenter: number,
+    o2Level: number,
+    sh5Temp: number
+): AnomalyState => {
+    const now = new Date().toISOString();
+    const activeAnomalies: AnomalySignature[] = [];
+    let explosionRiskScore = 0;
+
+    // Enregistrer la température actuelle
+    recordTemperature(sh5Temp);
+    const tempDelta = calculateTempDelta();
+
+    // ========================================
+    // 1. VÉRIFICATION BARYCENTRE
+    // ========================================
+    if (barycenter > ANOMALY_THRESHOLDS.BARYCENTER_MAX) {
+        const severity = barycenter > 5.0 ? 'critical' : 'high';
+        activeAnomalies.push({
+            type: 'BARYCENTER_REAR',
+            timestamp: now,
+            value: barycenter,
+            threshold: ANOMALY_THRESHOLDS.BARYCENTER_MAX,
+            severity,
+            message: `Feu trop en arrière (${barycenter.toFixed(2)} > ${ANOMALY_THRESHOLDS.BARYCENTER_MAX})`,
+            action: 'Augmenter débit Zone 1 ou ralentir vitesse grille'
+        });
+        explosionRiskScore += severity === 'critical' ? 40 : 25;
+    }
+
+    // ========================================
+    // 2. VÉRIFICATION O2
+    // ========================================
+    if (o2Level < ANOMALY_THRESHOLDS.O2_MIN) {
+        const severity = o2Level < 2.0 ? 'critical' : 'high';
+        activeAnomalies.push({
+            type: 'O2_LOW',
+            timestamp: now,
+            value: o2Level,
+            threshold: ANOMALY_THRESHOLDS.O2_MIN,
+            severity,
+            message: `O2 chaudière critique (${o2Level.toFixed(1)}% < ${ANOMALY_THRESHOLDS.O2_MIN}%)`,
+            action: 'URGENT: Augmenter Air Secondaire immédiatement'
+        });
+        explosionRiskScore += severity === 'critical' ? 45 : 30;
+    }
+
+    // ========================================
+    // 3. VÉRIFICATION SPIKE TEMPÉRATURE
+    // ========================================
+    if (tempDelta > ANOMALY_THRESHOLDS.TEMP_DELTA_MAX) {
+        const severity = tempDelta > 20 ? 'critical' : 'high';
+        activeAnomalies.push({
+            type: 'TEMP_SPIKE',
+            timestamp: now,
+            value: tempDelta,
+            threshold: ANOMALY_THRESHOLDS.TEMP_DELTA_MAX,
+            severity,
+            message: `Montée rapide T° SH5 (+${tempDelta.toFixed(1)}°C en 2min)`,
+            action: 'Réduire charge (Poussoir) et augmenter Air Secondaire'
+        });
+        explosionRiskScore += severity === 'critical' ? 40 : 25;
+    }
+
+    // ========================================
+    // 4. DÉTECTION SIGNATURE EXPLOSION
+    // Si 2+ anomalies actives simultanément
+    // ========================================
+    if (activeAnomalies.length >= 2) {
+        activeAnomalies.push({
+            type: 'EXPLOSION_RISK',
+            timestamp: now,
+            value: explosionRiskScore,
+            threshold: ANOMALY_THRESHOLDS.RISK_SCORE_CRITICAL,
+            severity: 'critical',
+            message: '⚠️ SIGNATURE EXPLOSION DÉTECTÉE - Conditions similaires à l\'incident du 20/12/2025',
+            action: '🚨 ACTION IMMÉDIATE: Augmenter Air Secondaire + Ralentir Grille + Réduire Poussoir'
+        });
+        explosionRiskScore = Math.min(100, explosionRiskScore + 20);
+    }
+
+    // ========================================
+    // 5. DÉTERMINER LE NIVEAU DE RISQUE
+    // ========================================
+    let riskLevel: RiskLevel = 'NORMAL';
+    if (explosionRiskScore >= ANOMALY_THRESHOLDS.RISK_SCORE_EMERGENCY) {
+        riskLevel = 'EMERGENCY';
+    } else if (explosionRiskScore >= ANOMALY_THRESHOLDS.RISK_SCORE_CRITICAL) {
+        riskLevel = 'CRITICAL';
+    } else if (explosionRiskScore >= ANOMALY_THRESHOLDS.RISK_SCORE_WARNING) {
+        riskLevel = 'WARNING';
+    }
+
+    return {
+        riskLevel,
+        activeAnomalies,
+        lastCheck: now,
+        explosionRiskScore
+    };
+};
+
+/**
+ * Réinitialise l'historique des températures
+ * À appeler lors d'un reset ou changement de mode
+ */
+export const resetAnomalyHistory = (): void => {
+    tempHistory.length = 0;
+};

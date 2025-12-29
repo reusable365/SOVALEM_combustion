@@ -125,8 +125,9 @@ function MainApp() {
           </div>
         </header>
 
-        {/* ALERT BANNER */}
+        {/* ALERT BANNER - WITH ANOMALY DETECTION */}
         <AlertBanner
+          anomalyState={boilerData.anomalyState}
           sh5Temp={boilerData.simulation.sh5Temp}
           o2={boilerData.simulation.simulatedO2}
           barycenter={boilerData.currentBarycenter}
