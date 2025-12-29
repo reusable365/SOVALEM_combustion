@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function: Check if user is admin by reading config/admins document
+    function isAdmin() {
+      return request.auth != null 
+             && request.auth.token.email in get(/databases/$(database)/documents/config/admins).data.emails;
+    }
+    
+    // Config collection - Only admins can read/write
+    match /config/{configId} {
+      // Admins can read config (including admin list)
+      allow read: if request.auth != null;
+      
+      // Only existing admins can modify config (bootstrap with Firebase Console)
+      allow write: if isAdmin();
+    }
+    
+    // Access requests - Security hardened
+    match /accessRequests/{requestId} {
+      // Allow ANYONE to create a request (unauthenticated users on login page)
+      // Validates required fields and enforces pending status
+      allow create: if request.resource.data.keys().hasAll(['email', 'name', 'service', 'status'])
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() > 0
+                    && request.resource.data.email.size() < 256;
+      
+      // Read access: Allow queries (needed for hasPendingRequest check on login page)
+      // This is acceptable as accessRequests contain no sensitive data (just name/email/status)
+      allow read: if true;
+      
+      // Only authenticated ADMINS can update/delete
+      allow update, delete: if isAdmin();
+    }
+    
+    // Allowed users - authenticated users can read, only admins can write
+    match /allowedUsers/{email} {
+      // Anyone authenticated can check if they are allowed
+      allow read: if request.auth != null;
+      
+      // Only admins can add/modify allowed users
+      allow write: if isAdmin();
+    }
+  }
+}

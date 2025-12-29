@@ -1,0 +1,6 @@
+# Bloquer tous les robots (Google, Bing, etc.)
+User-agent: *
+Disallow: /
+
+# Facultatif: Mentionner explicitement qu'on ne veut pas d'indexation
+Noindex: /

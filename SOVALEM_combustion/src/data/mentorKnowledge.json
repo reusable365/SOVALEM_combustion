@@ -1,0 +1,106 @@
+{
+    "lessons": [
+        {
+            "id": "lesson-001",
+            "category": "temperature",
+            "keywords": [
+                "sh5",
+                "surchauffe",
+                "température",
+                "chaud"
+            ],
+            "question": "Que faire si SH5 dépasse 640°C ?",
+            "answer": "**Actions immédiates** :\n1. Augmenter Air Secondaire (+2000 Nm³/h)\n2. Baisser Poussoir (-10%)\n3. Vérifier si Mode 2 est actif\n4. Si encrassement > 30%, lancer ramonage",
+            "source": "Procédure standard SOVALEM"
+        },
+        {
+            "id": "lesson-002",
+            "category": "barycenter",
+            "keywords": [
+                "barycentre",
+                "feu",
+                "position",
+                "répartition"
+            ],
+            "question": "Comment régler le barycentre du feu ?",
+            "answer": "**Pour déplacer le feu** :\n- Vers l'AVANT (< 3.0) : Augmenter Zone 1\n- Vers l'ARRIÈRE (> 3.5) : Augmenter Zone 3\n- **Barycentre optimal** : 3.0-3.5\n\nSi instable : Vérifier qualité déchets (OM/DIB ratio)",
+            "source": "Guide opérateur"
+        },
+        {
+            "id": "lesson-003",
+            "category": "oxygen",
+            "keywords": [
+                "o2",
+                "oxygène",
+                "combustion"
+            ],
+            "question": "Pourquoi mon O2 varie-t-il en Mode 2 ?",
+            "answer": "**Causes fréquentes** :\n1. Variation de charge (Poussoir auto-régulé)\n2. Qualité déchets hétérogène\n3. Air Secondaire en oscillation\n\n**Solution** : Passer temporairement en Mode 1 pour stabiliser",
+            "source": "REX 2024"
+        },
+        {
+            "id": "lesson-004",
+            "category": "pci",
+            "keywords": [
+                "pci",
+                "plastique",
+                "explosif",
+                "qualité"
+            ],
+            "question": "Comment gérer un arrivage à PCI élevé ?",
+            "answer": "**Anticipation** :\n1. Augmenter AS de +2000 Nm³/h AVANT que ça arrive au foyer\n2. Baisser Poussoir de 10-15%\n3. Surveiller barycentre (risque de recul < 2.5)\n\n**Si trop tard** : Activer Mode 2 pour auto-régulation",
+            "source": "Chef Dupont"
+        },
+        {
+            "id": "lesson-005",
+            "category": "fouling",
+            "keywords": [
+                "encrassement",
+                "ramonage",
+                "suie",
+                "efficacité"
+            ],
+            "question": "Quand dois-je ramoner ?",
+            "answer": "**Indicateurs** :\n- Encrassement > 30%\n- SH5 élevé malgré O2 > 8%\n- Perte d'efficacité (+ d'air pour même T°)\n\n**Fréquence** : Tous les 3-5 jours (selon qualité déchets)",
+            "source": "Maintenance"
+        },
+        {
+            "id": "lesson-006",
+            "category": "mode",
+            "keywords": [
+                "mode 1",
+                "mode 2",
+                "régulation",
+                "automatique"
+            ],
+            "question": "Quelle différence entre Mode 1 et Mode 2 ?",
+            "answer": "**Mode 1 - Loi Vapeur** :\n- AS = Vapeur × 250\n- Usage : Démarrage, charge partielle\n- Inconvénient : O2 non optimal\n\n**Mode 2 - Bilan Air** :\n- AS = Besoin Total - AP\n- Usage : Régime nominal\n- Avantage : Optimisation auto O2",
+            "source": "Documentation technique"
+        },
+        {
+            "id": "lesson-007",
+            "category": "startup",
+            "keywords": [
+                "démarrage",
+                "démarrer",
+                "allumage"
+            ],
+            "question": "Procédure de démarrage ?",
+            "answer": "**Étapes** :\n1. Vérifier AP Total = 28000 Nm³/h\n2. Mode 1 actif\n3. Poussoir à 30%, Grille à 40%\n4. Attendre SH5 > 500°C\n5. Passer Mode 2 progressivement\n6. Ajuster consigne vapeur",
+            "source": "Procédure officielle"
+        },
+        {
+            "id": "lesson-008",
+            "category": "inertia",
+            "keywords": [
+                "inertie",
+                "retard",
+                "lent",
+                "réaction"
+            ],
+            "question": "Pourquoi la température réagit lentement ?",
+            "answer": "**Inertie thermique** :\nLa chaudière met 15-20 minutes à réagir aux changements.\n\n**Conseil** : Ne pas sur-piloter ! Attendez l'effet de vos actions avant de corriger à nouveau.",
+            "source": "Formation"
+        }
+    ]
+}
