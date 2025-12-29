@@ -1,0 +1,129 @@
+================================================================================
+                    RÉSUMÉ DU PROJET SOVALEM COMBUSTION
+                    Pour analyse par une autre IA Gemini
+================================================================================
+
+⚠️  CE N'EST PAS DU PYTHON, C'EST DU TYPESCRIPT/REACT !
+
+STACK TECHNIQUE :
+- Frontend : React + TypeScript + Vite
+- Backend : Firebase (Hosting + Firestore + Cloud Functions)
+- Parsing CSV : PapaParse
+
+================================================================================
+                         FICHIERS CLÉS DU MOTEUR DE CALCUL
+================================================================================
+
+1. MOTEUR DE CALCUL - combustionLogic.ts
+   URL: https://github.com/reusable365/SOVALEM_combustion/blob/main/src/utils/combustionLogic.ts
+   Contient: Barycenter, PCI dynamique, Fire Status, catégories de déchets
+
+2. MOTEUR DE SIMULATION - simulationEngine.ts
+   URL: https://github.com/reusable365/SOVALEM_combustion/blob/main/src/utils/simulationEngine.ts
+   Contient: Simulation temps réel, régulation, inertie thermique
+
+3. IMPORT CSV - csvParser.ts
+   URL: https://github.com/reusable365/SOVALEM_combustion/blob/main/src/utils/csvParser.ts
+   Contient: Parsing des données PCVue, mapping des colonnes
+
+4. INTERFACES TYPESCRIPT - types/index.ts
+   URL: https://github.com/reusable365/SOVALEM_combustion/blob/main/src/types/index.ts
+   Contient: DataPoint, ZoneData, WasteMix, BoilerState
+
+5. HOOK PRINCIPAL - useBoilerData.ts
+   URL: https://github.com/reusable365/SOVALEM_combustion/blob/main/src/hooks/useBoilerData.ts
+   Contient: State management, upload fichiers, contrôle zones
+
+================================================================================
+                         MAPPING TAGS PCVUE → SIMULATEUR
+================================================================================
+
+Tag PCVue                      | Variable Simulateur | Description
+-------------------------------|---------------------|------------------------
+Inc_AP3_FT10342N_YOUT          | zone1Flow           | Débit Zone 1 (Nm³/h)
+Inc_AP3_FT10352N_YOUT          | zone2Flow           | Débit Zone 2 (Nm³/h)
+Inc_AP3_FT10362N_YOUT          | zone3Flow           | Débit Zone 3 (Nm³/h)
+Chaud_Vap_TT12115_YOUT         | sh5Temp             | Température SH5 (°C)
+Chaud_Vap_TT12300_YOUT         | (fallback SH5)      | Sortie Chaudière (°C)
+Inc_Combus_AT12303_YOUT        | o2Level             | Niveau O2 (%)
+Debit_Vapeur                   | steamFlow           | Débit vapeur (T/h)
+
+================================================================================
+                         FORMULES CLÉS (combustionLogic.ts)
+================================================================================
+
+1. BARYCENTRE DU FEU (Position du front de flamme)
+   -------------------------------------------------
+   barycenter = (Z1 × 1.5 + Z2 × 3.5 + Z3 × 5.5) / (Z1 + Z2 + Z3)
+   
+   Interprétation:
+   - < 3.0 : Feu trop en avant (risque combustion incomplète)
+   - 3.0 - 4.0 : Zone optimale
+   - > 4.0 : Feu trop en arrière (surchauffe SH5)
+
+2. PCI ESTIMÉ (Pouvoir Calorifique Inférieur virtuel)
+   ---------------------------------------------------
+   estimatedPCI = (steamFlow × 2675) / (totalAirFlow × 0.00129 × (21 - o2Real) / 21)
+   
+   Plage: 6000 - 14000 kJ/kg typique pour déchets ménagers
+
+3. CATÉGORIES DE DÉCHETS (5 types)
+   --------------------------------
+   - WET (Humide)      : PCI ~6000 kJ/kg  - "L'Extincteur"
+   - STANDARD          : PCI ~9200 kJ/kg  - "Le Standard"
+   - BOOST             : PCI ~12500 kJ/kg - "Le Booster"
+   - HIGH_POWER        : PCI ~21000 kJ/kg - "La Flamme" (plastiques)
+   - INERT             : PCI ~0 kJ/kg     - "Le Lest" (gravats)
+
+================================================================================
+                         STRUCTURE DES DONNÉES (DataPoint)
+================================================================================
+
+interface DataPoint {
+    id: string;              // Identifiant unique
+    timestamp: string;       // Horodatage
+    zone1Flow: number;       // Débit Zone 1
+    zone2Flow: number;       // Débit Zone 2
+    zone3Flow: number;       // Débit Zone 3
+    rollersFlow?: number[];  // [R1, R2, R3, R4, R5, R6] optionnel
+    sh5Temp: number;         // Température surchauffeur 5
+    steamFlow: number;       // Débit vapeur T/h
+    o2Level: number;         // Niveau O2 %
+    barycenter: number;      // Position calculée du feu
+    isTechnicalStop?: boolean; // Arrêt technique si SH5 < 500°C
+}
+
+================================================================================
+                         FORMAT CSV ATTENDU
+================================================================================
+
+Le parser attend un CSV avec:
+- Séparateur: virgule ou point-virgule
+- Décimales: virgule française supportée (convertie en point)
+- Header obligatoire: "Timestamp" comme première colonne
+- Colonnes nommées selon les tags PCVue ci-dessus
+
+Exemple de ligne:
+Timestamp,Inc_AP3_FT10342N_YOUT,Inc_AP3_FT10352N_YOUT,...
+2024-01-15 10:30:00,2500,3200,2800,...
+
+================================================================================
+                         PROCHAINES ÉTAPES SUGGÉRÉES
+================================================================================
+
+1. VÉRIFIER LA STŒCHIOMÉTRIE
+   Comparer le calcul d'O2 théorique avec les données réelles (AT12303)
+
+2. CALIBRER L'INERTIE
+   Analyser le délai entre changement vitesse grille et variation temp vapeur
+
+3. CRÉER L'IMPORTATEUR
+   Script Python/JS pour transformer les fichiers PCVue au format attendu
+
+4. AJOUTER LES TAGS MANQUANTS
+   - Vitesse grille (ST10010)
+   - Airs sous rouleaux
+   - Air secondaire
+   - Événements ramonage
+
+================================================================================
